@@ -74,12 +74,12 @@ Now you can execute the bulk import in the same way we did it before:
 - `bin/tdbloader2 --loc=[path_of_new_db_folder] [path_of_nt_file]`
 
 In order to be able to run the benchmark for Leapfrog Jena you also need to use a custom fuseki-server.jar
+
 - Install openjdk-8, mvn and set `JAVA_HOME` to use java 8
 - `git clone https://github.com/cirojas/jena-leapfrog`
 - `cd jena-leapfrog`
 - `mvn clean install -Drat.numUnapprovedLicenses=100 -Darguments="-Dmaven.javadoc.skip=true" -DskipTests`
 - Use `jena-fuseki2/apache-jena-fuseki/target/apache-jena-fuseki-3.9.0.tar.gz` instead of the one you download normally.
-
 
 ## Data loading for Virtuoso
 
@@ -228,10 +228,10 @@ bin/neo4j-admin import --database wikidata \
  --delimiter "," --array-delimiter ";" --skip-bad-relationships true
 ```
 
-
 Now we have to create the index for entities:
 
 - Start the server: `bin/neo4j console`
+
   - This process won't end until you interrupt it (Ctrl+C). Let this execute until the index creation is finished. Run the next command in another terminal.
 
 - Open the cypher console:
@@ -239,9 +239,22 @@ Now we have to create the index for entities:
     - `CREATE INDEX ON :Entity(id);`
     - Even though the above command returns immediately, you have to wait until is finished before interrupting the server. You can see the status of the index with the command `SHOW INDEXES;`
 
+## Data loading for qEndpoint
+
+### 1. Download qEndpoint
+
+Download the jar
+
+```powershell
+wget https://github.com/the-qa-company/qEndpoint/releases/latest/download/qendpoint.jar -O Execution/benchmark_data/qendpoint/qendpoint.jar
+```
+
+Index your own HDT and put it in `Execution/benchmark_data/qendpoint/qendpoint/hdt-store/index_dev.hdt` and `Execution/benchmark_data/qendpoint/qendpoint/hdt-store/index_dev.hdt.index.v1-1` (if you have the index)
+
 # Wikidata Queries
 
 In this benchmark we have 5 sets of queries:
+
 - Basic Graph Patterns (BGPs):
   - Single BGPs : 280 queries
   - Multiple BGPs: 681 queries
@@ -266,14 +279,15 @@ Here we provide a description of the scripts we used for the execution of the qu
 Our scripts will execute a list of queries for a certain engine, one at a time, and register the time and number of results for each query in a csv file.
 
 Every time you want to run a benchmark script you must clear the cache of the system before. To do this, run as root:
-- `sync; echo 3 > /proc/sys/vm/drop_caches`
 
+- `sync; echo 3 > /proc/sys/vm/drop_caches`
 
 Then you have 2 scripts for executing the benchmarks, one for SPARQL engines and another for NEO4J. They are placed in the `Execution` folder.
 
 Each script has a **parameters section** near the beginning of the file, (e.g. database paths, output folder) make sure to edit the script to set them properly.
 
 To execute the benchmark for a SPARQL engine you need to pass 4 parameters:
+
 1. the engine name (`JENA`, `BLAZEGRAPH` or `VIRTUOSO`).
 2. the limit for the queries
 3. the absolute path to the query file.
@@ -284,6 +298,7 @@ E.g.
 - `python Execution/benchmark.py JENA ~/WDBench/Queries/paths.txt 100000 paths`
 
 To execute the benchmark for NEO4J you need to manually start the server after clearing the cache. Then you can execute the script passing 3 parameters:
+
 1. the path (absolute or relative) to the query file.
 2. the limit for the queries
 3. Any name you want to give as a prefix for the output file.
@@ -291,5 +306,3 @@ To execute the benchmark for NEO4J you need to manually start the server after c
 E.g.
 
 - `python Execution/cypher_benchmark.py Cypher/cypher_opts.txt 100000 opts`
-
-

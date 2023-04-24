@@ -7,20 +7,22 @@ import subprocess
 import sys
 import time
 import traceback
+import pathlib
+import psutil
 
 # Usage:
-# python benchmark.py <ENGINE> <QUERIES_FILE_ABSOLUTE_PATH> <LIMIT> <PREFIX_NAME>
+# python benchmark.py <ENGINE> <QUERIES_FILE> <LIMIT> <PREFIX_NAME>
 # LIMIT = 0 will not add a limit
 
 # Db engine that will execute queries
 ENGINE       = sys.argv[1]
-QUERIES_FILE = sys.argv[2]
+QUERIES_FILE = os.path.abspath(sys.argv[2])
 LIMIT        = sys.argv[3]
 PREFIX_NAME  = sys.argv[4]
 
 ###################### EDIT THIS PARAMETERS ######################
 TIMEOUT = 60 # Max time per query in seconds
-BENCHMARK_ROOT = '/data2/benchmark'
+BENCHMARK_ROOT = 'C:\\Users\\wilat\\workspace\\WDBench\\Execution\\benchmark_data'
 
 # Path to needed output and input files
 RESUME_FILE = f'{BENCHMARK_ROOT}/results/{PREFIX_NAME}_{ENGINE}_limit_{LIMIT}.csv'
@@ -36,6 +38,7 @@ ENGINES_PATHS = {
     'JENA':       f'{BENCHMARK_ROOT}/jena',
     'VIRTUOSO':   f'{BENCHMARK_ROOT}/virtuoso',
     'QLEVER':     f'{BENCHMARK_ROOT}/qlever',
+    'QENDPOINT':  f'{BENCHMARK_ROOT}/qendpoint',
 }
 
 ENGINES_PORTS = {
@@ -43,6 +46,7 @@ ENGINES_PORTS = {
     'JENA':       3030,
     'VIRTUOSO':   1111,
     'QLEVER':     7001,
+    'QENDPOINT':  1234,
 }
 
 ENDPOINTS = {
@@ -50,37 +54,39 @@ ENDPOINTS = {
     'JENA':       'http://localhost:3030/jena/sparql',
     'VIRTUOSO':   'http://localhost:8890/sparql',
     'QLEVER':     'http://localhost:7001/sparql',
+    'QENDPOINT':  'http://localhost:1234/api/endpoint/sparql',
 }
 
 SERVER_CMD = {
     'BLAZEGRAPH': ['./runBlazegraph.sh'],
     'JENA': f'java -Xmx64g -jar apache-jena-fuseki-4.1.0/fuseki-server.jar --loc=apache-jena-4.1.0/wikidata --timeout={TIMEOUT*1000} /jena'.split(' '),
     'VIRTUOSO': ['bin/virtuoso-t', '-c', 'wikidata.ini', '+foreground'],
-    'QLEVER': f'TIMEOUT=600; PORT=7001; docker run --rm -v $QLEVER_HOME/qlever-indices/wikidata:/index  -p $PORT:7001 -e INDEX_PREFIX=wikidata --name qlever.wikidata qlever-docker'
+    'QLEVER': f'TIMEOUT=600; PORT=7001; docker run --rm -v $QLEVER_HOME/qlever-indices/wikidata:/index  -p $PORT:7001 -e INDEX_PREFIX=wikidata --name qlever.wikidata qlever-docker',
+    'QENDPOINT':  ['java', '-jar', 'qendpoint.jar'],
 }
 #######################################################
 
 PORT = ENGINES_PORTS[ENGINE]
 
-server_log = open(SERVER_LOG_FILE, 'w')
-server_process = None
-
-# Check if output file already exists
-if os.path.exists(RESUME_FILE):
-    print(f'File {RESUME_FILE} already exists.')
-    sys.exit()
-
 # ================== Auxiliars ===============================
-def lsof(pid):
-    process = subprocess.Popen(['lsof', '-a', f'-p{pid}', f'-i:{PORT}', '-t'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, _ = process.communicate()
-    return out.decode('UTF-8').rstrip()
+def lsof(pid: int) -> bool:
+    try:
+        proc = psutil.Process(pid)
+        if not proc.is_running():
+            return False
+        for conn in proc.connections():
+            if conn.status == psutil.CONN_LISTEN and conn.laddr.port == PORT:
+                return True
+    except psutil.NoSuchProcess:
+        pass # ignore nsp
+    return False
 
-def lsofany():
-    process = subprocess.Popen(['lsof', '-t', f'-i:{PORT}'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, _ = process.communicate()
-    return out.decode('UTF-8').rstrip()
-
+def lsofany() -> bool:
+    for conn in psutil.net_connections():
+        if conn.status == psutil.CONN_LISTEN and conn.laddr.port == PORT:
+            return True
+        
+    return False
 
 # ================== Parsers =================================
 def parse_to_sparql(query):
@@ -233,20 +239,42 @@ def query_sparql(query_pattern, query_number):
         start_server()
 
 
-with open(RESUME_FILE, 'w') as file:
-    file.write('query_number,results,status,time\n')
+def main():
+    global server_log
+    os.makedirs(pathlib.Path(SERVER_LOG_FILE).absolute().parent, exist_ok=True)
 
-with open(ERROR_FILE, 'w') as file:
-    file.write('') # to replaces the old error file
+    with open(SERVER_LOG_FILE, 'w') as server_log:
+        server_process = None
 
-if lsofany():
-    raise Exception("other server already running")
+        # Check if output file already exists
+        if os.path.exists(RESUME_FILE):
+            resumte_file_bkp = RESUME_FILE + ".bck"
+            idx = 0
+            while os.path.exists(resumte_file_bkp):
+                idx += 1
+                resumte_file_bkp = RESUME_FILE + "_" + str(idx) + ".bck"
+            os.rename(RESUME_FILE, resumte_file_bkp)
+            print(f'File "{RESUME_FILE}" already exists, creating backup at "{resumte_file_bkp}".')
+            
+        os.makedirs(pathlib.Path(RESUME_FILE).absolute().parent, exist_ok=True)
+        os.makedirs(pathlib.Path(ERROR_FILE).absolute().parent, exist_ok=True)
 
-print('benchmark is starting. TIMEOUT', TIMEOUT, 'seconds')
-start_server()
-execute_queries()
+        with open(RESUME_FILE, 'w') as file:
+            file.write('query_number,results,status,time\n')
 
-if server_process is not None:
-    kill_server()
+        with open(ERROR_FILE, 'w') as file:
+            file.write('') # to replaces the old error file
 
-server_log.close()
+        if lsofany():
+            raise Exception("other server already running")
+
+        print('benchmark is starting. TIMEOUT', TIMEOUT, 'seconds')
+        start_server()
+        execute_queries()
+
+        if server_process is not None:
+            kill_server()
+
+
+if __name__== "__main__":
+    main()
