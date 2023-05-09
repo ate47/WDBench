@@ -1,0 +1,14 @@
+loader.cattree.futureHDTLocation=cfuture.hdt
+loader.cattree.loadertype=disk
+loader.cattree.location=cattree
+loader.cattree.memoryFaultFactor=1
+loader.disk.futureHDTLocation=future_msd.hdt
+loader.disk.location=gen
+loader.type=cat
+parser.ntSimpleParser=true
+loader.disk.compressWorker=3
+profiler=true
+profiler.output=prof.opt
+loader.cattree.kcat=20
+hdtcat.location=catgen
+hdtcat.location.future=catgen.hdt

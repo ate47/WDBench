@@ -239,17 +239,6 @@ Now we have to create the index for entities:
     - `CREATE INDEX ON :Entity(id);`
     - Even though the above command returns immediately, you have to wait until is finished before interrupting the server. You can see the status of the index with the command `SHOW INDEXES;`
 
-## Data loading for qEndpoint
-
-### 1. Download qEndpoint
-
-Download the jar
-
-```powershell
-wget https://github.com/the-qa-company/qEndpoint/releases/latest/download/qendpoint.jar -O Execution/benchmark_data/qendpoint/qendpoint.jar
-```
-
-Index your own HDT and put it in `Execution/benchmark_data/qendpoint/qendpoint/hdt-store/index_dev.hdt` and `Execution/benchmark_data/qendpoint/qendpoint/hdt-store/index_dev.hdt.index.v1-1` (if you have the index)
 
 # Wikidata Queries
 
